@@ -1,0 +1,85 @@
+\documentclass[journal, final]{IEEEtran}
+
+% Title, authors info etc.
+\title{Navigating Data Augmentations for Segmentation}
+\author{
+    Shawn Carere\textsuperscript{$\ast \dagger \star$}, 
+    Sayan Nag\textsuperscript{$\ast \dagger \diamond$}
+    \thanks{Both authors contributed equally to this work}
+    \thanks{\textsuperscript{$\ast$} Department of Medical Biophysics, University of Toronto, Canada}
+    \thanks{\textsuperscript{$\dagger$} Techna Institute, Toronto, Canada}
+    \thanks{
+        \textsuperscript{$\star$} shawncarere@gmail.ca, 
+        \textsuperscript{$\diamond$} sayan.nag@mail.utoronto.ca
+        }
+    \thanks{Last edited on \today}
+    }
+
+
+\begin{document}
+    \maketitle
+    \markboth{Biomedical Applications of AI, February 2022}{}
+    \IEEEpubid{MBP1413~Winter 2022}
+
+    \begin{abstract}
+        This is a placeholder abstract which will describe the premise
+        of our paper
+    \end{abstract}
+
+    \begin{IEEEkeywords}
+        data augmentation, nuclei segmentation, deep learning, U-Net
+    \end{IEEEkeywords}
+
+    \section{Introduction}\label{s:intro}
+        \IEEEPARstart{T}{his} is the beginning of the introduction. Here
+        we will motivate why we want to explore the use of data augmentation,
+        particularly for images, in the field of machine learning. 
+        
+        Furthermore
+        we will introduce nuclei segmentation as the task for which we will
+        be testing data augmentations. We will explain why nuclei
+        segmentation is an important problem in general, why we chose this
+        task to test data augmentation, why data augmentation is important
+        for segmentation problems etc.
+    \section{Background}\label{s:background}
+        In this section we will describe the field and existing work done
+        for nuclei segmentation
+    \section{Methods}\label{s:methods}
+        \subsection{Dataset}\label{ss:dataset}
+            Here we will describe the dataset we chose to use. Test TRAIN
+            split. Downsampling etc.
+        \subsection{Models}\label{ss:models}
+            Here we will describe the different models that we tried.
+            We could give their baseline results without data aug here as
+            well.
+        \subsection{Experimental Design}\label{ss:experiments}
+            Here we will explain which models we decided to run
+            data aug experiments on and why. We will also describe the
+            different data aug experiments we chose to Run
+            \subsubsection{Experiment 1}
+                Just realized that subsubsections in this template show
+                up as more of a list than a section
+            \subsubsection{Experiment 2}
+                We will need to keep the experiment descriptions brief then
+            \subsubsection{Experiment 3}
+                Might need to reformat this section bc not sure how i feel
+                about the subsubsections
+    \section{Results}\label{s:results}
+        \subsection{Results from Experiment 1}
+        \subsection{Results from Experiment 2}
+        \subsection{Results from Experiment 3}
+
+    \section{Discussion}
+        I've always thought of the discussion as sort of a conclusion of
+        for the results  section
+    \section{Conclusion}
+        Briefly summaraize the keypoints from the paper
+    \section*{Awknowledgments}
+        Thank the course instructors as well as PI's that took the time to give
+        lectures/presentationss
+    \appendix
+        Just in case we need one. If we have more than 1 distinct idea
+        and or figure that needs to go here, then it should be changed to
+        $\backslash${\tt{appendices}}, and we will create sub appendices
+        \section*{References}
+\end{document}
