@@ -1,11 +1,8 @@
 import torch
-import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
-from tqdm import trange
-from time import sleep
 
 batch_size = 32
 epochs = 100

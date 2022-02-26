@@ -4,9 +4,6 @@ import torch.nn.functional as F
 import numpy as np
 from itertools import chain
 from sklearn.model_selection import train_test_split
-from skimage.io import imread, imshow, imread_collection, concatenate_images
-from skimage.transform import resize
-from skimage.morphology import label
 
 class Dataset_train_val(nn.Module):
     def __init__(self,batch_size,use_gpu):

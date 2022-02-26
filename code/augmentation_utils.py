@@ -1,10 +1,8 @@
 import torch
 import torch.nn as nn
-import torchvision
 from torch import Tensor
-from torch.nn import functional as F
-from kornia import image_to_tensor, tensor_to_image
 from kornia.augmentation import *
+
 class DataAugmentation(nn.Module):
     """Module to perform data augmentation using Kornia on torch tensors."""
 

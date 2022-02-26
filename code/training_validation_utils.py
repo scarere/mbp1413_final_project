@@ -1,15 +1,12 @@
 import torch
-import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 from tqdm import trange
-from time import sleep
 import numpy as np
 from model_utils import *
 from loss_utils import *
-from dataset_train_val import Dataset_train_val
 from augmentation_utils import DataAugmentation
 
 class Training_Validation():
