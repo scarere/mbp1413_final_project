@@ -1,20 +1,15 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.autograd import Variable
-
-batch_size = 32
-epochs = 100
-epoch_lapse = 20
-threshold = 0.33
-sample_size = None
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
 import numpy as np
+
+batch_size = 32
+epochs = 100
+epoch_lapse = 20
+threshold = 0.33
+sample_size = None
 
 def init_weights(net, init_type='normal', gain=0.02):
     def init_func(m):
@@ -212,7 +207,7 @@ class Attention_block(nn.Module):
 
 class U_Netv2(nn.Module):
     def __init__(self,img_ch=3,output_ch=1):
-        super(U_Net,self).__init__()
+        super(U_Netv2,self).__init__()
         
         self.Maxpool = nn.MaxPool2d(kernel_size=2,stride=2)
 

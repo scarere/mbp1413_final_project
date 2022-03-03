@@ -1,3 +1,8 @@
+import os
+import sys
+# Add filepath to sys so that below imports work when this file is called
+# from another directory
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,8 +25,8 @@ class Training_Validation():
 
     def hybrid_loss(self, loss_1, loss_2):
         min_vals = torch.minimum(loss_1,loss_2)
-        coeffs_1 = torch.sin(1.57*min_vals/loss_1)**self.power
-        coeffs_2 = torch.sin(1.57*min_vals/loss_2)**self.power
+        coeffs_1 = torch.sin((np.pi/2)*min_vals/loss_1)**self.power
+        coeffs_2 = torch.sin((np.pi/2)*min_vals/loss_2)**self.power
         coeffs_1 = coeffs_1/(coeffs_1 + coeffs_2)
         coeffs_2 = coeffs_2/(coeffs_1 + coeffs_2)
         if self.swap_coeffs == True:
