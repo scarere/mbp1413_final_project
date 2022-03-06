@@ -8,12 +8,16 @@ import torch
 from os.path import join
 from model_utils import UNet, AttU_Net, Hybrid_Net
 
+def scale_norm(data):
+    data = data/torch.max(torch.flatten(data, 1, -1))
+    return data
+
 def load_data(data_dir, print_shape=False, return_channel_counts=False):
     # Load data
-    x_train = torch.load(join(data_dir, 'x_train_split.pt'))
-    x_val = torch.load(join(data_dir, 'x_val_split.pt'))
-    y_train = torch.load(join(data_dir, 'y_train_split.pt'))
-    y_val = torch.load(join(data_dir, 'y_val_split.pt'))
+    x_train = scale_norm(torch.tensor(torch.load(join(data_dir, 'split/x_train_split.pt'))))
+    x_val = scale_norm(torch.tensor(torch.load(join(data_dir, 'split/x_val_split.pt'))))
+    y_train = scale_norm(torch.tensor(torch.load(join(data_dir, 'split/y_train_split.pt'))))
+    y_val = scale_norm(torch.tensor(torch.load(join(data_dir, 'split/y_val_split.pt'))))
 
     if print_shape:
         print('x_train: ', x_train.shape)
@@ -53,3 +57,6 @@ def select_model(ishybrid, attn_type, in_chan=3, out_chan=1, use_gpu=False):
         model = model.cuda()
 
     return model
+        
+
+

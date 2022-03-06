@@ -1,12 +1,20 @@
 # Imports
 from pickletools import optimize
 from select import select
+
+from tqdm import tqdm
 import config
 import sys
 import torch
-from os.path import join
+from os import path, makedirs
 from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
+import os
+import argparse
+import pandas as pd
+import matplotlib.pyplot as plt
+import yaml
+from torchinfo import summary
 
 # Custom imports
 sys.path.append(config.base_dir) # allow imports from base dir
@@ -16,30 +24,43 @@ from utils.model_utils import UNet, AttU_Net, Hybrid_Net
 from utils.helper_functions import load_data, select_model
 from utils.loss_utils import DiceBCELoss, DiceBCELossModified
 
+
+
 save = True
 
 model_args = {
     'name': 'unet_basic_test1',
-    'ishybrid': False,
     'attn': None,
+    'ishybrid': False,
     'power': None,
     'swap_coeff': False
 }
 
 train_args = {
     'batch_size': 32,
-    'epochs': 200,
+    'epochs': 1,
     'initial_lr': 0.01,
     'lr_schedule': None,
 }
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-sp', '--save_path', default=path.join('trained_models/', model_args['name']), help='Path to save the model to')
+parser.add_argument('-tq', '--tqdm', action='store_true', help='If included a progress bar is shown during training')
+parser.add_argument('-el', '--epoch_lapse', default=20, help='The period of epochs to wait between model validations')
+args = parser.parse_args()
 
 if model_args['ishybrid']:
     model_args['power'] = 2.0
 
 use_gpu = torch.cuda.is_available()
+if use_gpu:
+    print('Using: ', torch.cuda.get_device_name())
 
 x_train, y_train, x_val, y_val, in_chan, out_chan = load_data(config.data_dir, return_channel_counts=True)
+
 model = select_model(model_args['ishybrid'], model_args['attn'], in_chan=in_chan, out_chan=out_chan, use_gpu=use_gpu)
+print('start')
+summ = summary(model, input_size=[1].append(x_train.shape[1:]), input_data=x_train[0:2], col_names=('input_size', 'output_size',  'kernel_size', 'num_params'))
 
 optimizer = SGD(model.parameters(), lr=train_args['initial_lr'])
 
@@ -57,7 +78,7 @@ else:
 # Add stuff to training_args dict
 dict = optimizer.state_dict()['param_groups'][0].copy()
 del dict['params']
-train_args['optimizer'] = {'type': optimizer.__class__, 'params': dict}
+train_args['optimizer'] = {'type': optimizer.__name__, 'params': dict}
 train_args['loss'] = loss.__class__
 
 '''
@@ -74,31 +95,45 @@ dtv_class = Dataset_train_val(train_args['batch_size'], use_gpu)
 tv_class = Training_Validation(model_args['ishybrid'], power=model_args['power'], swap_coeffs=model_args['swap_coeff'])
 
 # Training
-train_losses, val_losses = tv_class.train_valid(
-    model,
-    x_train, 
-    y_train, 
-    x_val, 
-    y_val,
+if use_gpu:
+    model = model.cuda()
+train_metrics, val_metrics = tv_class.train_valid(
+    unet=model,
+    train_data=(x_train, y_train),
+    validation_data=(x_val, y_val),
     dtv=dtv_class,
     optimizer=optimizer,
     criterion=loss,
     batch_size=train_args['batch_size'],
     use_gpu=use_gpu,
-    epochs=train_args['epochs']
+    epochs=train_args['epochs'],
+    progress_bar=args.tqdm,
+    epoch_lapse=int(args.epoch_lapse),
+    metrics=['DICE', 'IoU']
     )
 
 if save:
-    if model_args['ishybrid']:
-        save_path = join(config.model_dir, 'baselines/unet_hybrid')
-    elif model_args['attn'] == 'cosine':
-        save_path = join(config.model_dir, 'baselines/unet_cos_attn')
-    elif model_args['attn'] == 'channel_attention':
-        save_path = join(config.model_dir, 'baselines/unet_channel_attn')
-    elif model_args['attn'] is not None:
-        save_path = join(config.model_dir, 'baselines/unet_pointwise_attn')
-    else:
-        save_path = join(config.model_dir, 'baselines/unet_basic')
+    print(path.isdir(args.save_path))
+    if not path.isdir(args.save_path):
+        makedirs(args.save_path)
+
+    torch.save(model, path.join(args.save_path, model_args['name']+'.pt'))
+    pd.DataFrame(val_metrics).to_csv(path.join(args.save_path, 'val_metrics.csv'))
+    pd.DataFrame(train_metrics).to_csv(path.join(args.save_path, 'train_metrics.csv'))
+
+    with open(path.join(args.save_path, 'train_args.yaml'), 'w') as file:
+        yaml.dump(train_args, file)
+
+    with open(path.join(args.save_path, 'model_args.yaml'), 'w') as file:
+        yaml.dump(model_args, file)
+
+    with open(path.join(args.save_path, model_args['name'] + '.txt'), 'w') as file:
+        file.write(summ.__repr__())
+    
+
+    
+
+    
 
     
 
