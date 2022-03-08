@@ -7,7 +7,9 @@ matplotlib
 torchinfo
 pyyaml
 torchmetrics
+imageio
+scikit-image
+ipywidgets
 
 # If using gpu must pip install +cu113 extensions for the following
 torch
-torchvision
