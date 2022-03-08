@@ -16,20 +16,21 @@ class CreateMask():
       unique_IDs = df['ImageId'].unique()
       dimension_list = []
       for i in range(n_imgs):
-        dimension_list.append((df.loc[df['ImageId'] == unique_IDs[i]]['Height'].values[0],df.loc[df['ImageId'] == unique_IDs[i]]['Width'].values[0]))
-        vals = df.loc[df['ImageId'] == unique_IDs[i]]['EncodedPixels'].values
+        # get height and width of each unique image
+        dimension_list.append((df.loc[df['ImageId'] == unique_IDs[i]]['Height'].values[0], df.loc[df['ImageId'] == unique_IDs[i]]['Width'].values[0]))
+        vals = df.loc[df['ImageId'] == unique_IDs[i]]['EncodedPixels'].values # list of encoded pixels
         final_vals = np.asarray([])
         for j in range(len(vals)):
           eps = vals[j].split(' ')
           for l in range(len(eps)):
             eps[l] = int(eps[l])
-          final_vals = np.concatenate((final_vals,np.asarray(eps)))
+          final_vals = np.concatenate((final_vals, np.asarray(eps)))
         arr = np.matrix.flatten(np.zeros(dimension_list[i]))
         r = 0
         while r < len(final_vals):
           arr[int(final_vals[r]):int(final_vals[r]+final_vals[r+1])] = 1
           r = r + 2
-        test_masks.append(arr.reshape(dimension_list[i]))
+        test_masks.append(arr.reshape(np.flip(dimension_list[i])).transpose())
       return test_masks
 
 # sample run

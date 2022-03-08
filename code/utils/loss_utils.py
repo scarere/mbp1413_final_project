@@ -7,19 +7,25 @@ class DiceBCELoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceBCELoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=1):
-        
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = F.sigmoid(inputs)       
-        
+    def dice_loss(self, pred, targets, smooth=1):
         #flatten label and prediction tensors
-        inputs = inputs.view(-1)
+        pred = pred.view(-1)
         targets = targets.view(-1)
         
-        intersection = (inputs * targets).sum()                            
-        dice_loss = 1 - (2.*intersection + smooth)/(inputs.sum() + targets.sum() + smooth)
-        BCE = F.binary_cross_entropy(inputs, targets, reduction='mean')
-        Dice_BCE = BCE + dice_loss
+        intersection = (pred * targets).sum()                            
+        dice_loss = 1 - (2.*intersection + smooth)/(pred.sum() + targets.sum() + smooth)
+        return dice_loss
+
+    def bce_loss(self, pred, targets):
+        pred = pred.view(-1)
+        targets = targets.view(-1)
+        bce_loss = F.binary_cross_entropy(pred, targets, reduction='mean')
+        return bce_loss
+
+    def forward(self, pred, targets, smooth=1):
+        dice_loss = self.dice_loss(pred, targets)
+        bce_loss = self.bce_loss(pred, targets)
+        Dice_BCE = bce_loss + dice_loss
         
         return Dice_BCE
 

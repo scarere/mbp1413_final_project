@@ -1,8 +1,9 @@
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-from torch.autograd import Variable
+from torch.nn import init
+import numpy as np
 
 batch_size = 32
 epochs = 100
@@ -10,11 +11,7 @@ epoch_lapse = 20
 threshold = 0.33
 sample_size = None
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn import init
-import numpy as np
+use_gpu = torch.cuda.is_available()
 
 def init_weights(net, init_type='normal', gain=0.02):
     def init_func(m):
@@ -135,47 +132,31 @@ class Attention_block(nn.Module):
             nn.BatchNorm2d(F_int)
         )
         
-        if attn_type == 'cosine':
-
-          self.psi = nn.Sequential(
-              nn.Conv2d(F_int, F_l, kernel_size=1,stride=1,padding=0,bias=True),
-              nn.BatchNorm2d(F_l)
-          )
-        
-        elif attn_type == 'regular_full':
-
-          self.psi = nn.Sequential(
-              nn.Conv2d(F_int, F_l, kernel_size=1,stride=1,padding=0,bias=True),
-              nn.BatchNorm2d(F_l)
-          )
-        
-        elif attn_type == 'regular_full_dim_add':
-
-          self.psi = nn.Sequential(
-              nn.Conv2d(F_int, F_l, kernel_size=1,stride=1,padding=0,bias=True),
-              nn.BatchNorm2d(F_l)
-          )
-          
-        elif attn_type == 'channel_attention':
-
-          self.psi = nn.Sequential(
-              nn.Conv2d(F_int, F_l, kernel_size=1,stride=1,padding=0,bias=True),
-              nn.BatchNorm2d(F_l)
-          )
-        
-        else:
+        if attn_type == 'regular_pointwise':
 
           self.psi = nn.Sequential(
               nn.Conv2d(F_int, 1, kernel_size=1,stride=1,padding=0,bias=True),
               nn.BatchNorm2d(1)
           )
         
+        else:
+
+          self.psi = nn.Sequential(
+              nn.Conv2d(F_int, F_l, kernel_size=1,stride=1,padding=0,bias=True),
+              nn.BatchNorm2d(F_l)
+          )
+        
+
         self.relu = nn.ReLU(inplace=True)
         
     def channel_mul(self, a, b):
         C = a.shape[1]
-        cos = torch.from_numpy(np.cos(np.arange(C)*1.57/C).reshape(1,C,1,1)).float().cuda()
-        sin = torch.from_numpy(np.sin(np.arange(C)*1.57/C).reshape(1,C,1,1)).float().cuda()
+        if use_gpu:
+            cos = torch.from_numpy(np.cos(np.arange(C)*1.57/C).reshape(1,C,1,1)).float().cuda()
+            sin = torch.from_numpy(np.sin(np.arange(C)*1.57/C).reshape(1,C,1,1)).float().cuda()
+        else:
+            cos = torch.from_numpy(np.cos(np.arange(C)*1.57/C).reshape(1,C,1,1)).float()
+            sin = torch.from_numpy(np.sin(np.arange(C)*1.57/C).reshape(1,C,1,1)).float()
         return ((a*cos)*torch.unsqueeze((b*cos).sum(1),1)) + ((a*sin)*torch.unsqueeze((b*sin).sum(1),1))
         
     def forward(self,g,x):
@@ -212,7 +193,7 @@ class Attention_block(nn.Module):
 
 class U_Netv2(nn.Module):
     def __init__(self,img_ch=3,output_ch=1):
-        super(U_Net,self).__init__()
+        super(U_Netv2,self).__init__()
         
         self.Maxpool = nn.MaxPool2d(kernel_size=2,stride=2)
 
@@ -422,7 +403,6 @@ class AttU_Net(nn.Module):
 
         return torch.sigmoid(d1)
 
-
 class R2AttU_Net(nn.Module):
     def __init__(self,img_ch=3,output_ch=1,t=2):
         super(R2AttU_Net,self).__init__()
@@ -534,7 +514,6 @@ class UNet(nn.Module):
                     torch.nn.ReLU(),
                     torch.nn.BatchNorm2d(mid_channel),
                     torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=out_channels, padding=1),
-                    torch.nn.Sigmoid(),
                     )
             return  block
     
@@ -604,7 +583,7 @@ class UNet(nn.Module):
         #print(decode_block1.shape)
         final_layer = self.final_layer(decode_block1)
         #print(final_layer.shape)
-        return  final_layer
+        return  torch.sigmoid(final_layer)
 
 
 class Hybrid_Net(nn.Module):
