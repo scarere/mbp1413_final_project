@@ -9,19 +9,19 @@ import torch
 from os import path, makedirs
 from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
-import os
 import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
 import yaml
 from torchinfo import summary
+import numpy as np
 
 # Custom imports
 sys.path.append(config.base_dir) # allow imports from base dir
 from utils.dataset_train_val import Dataset_train_val
 from utils.training_validation_utils import Training_Validation
 from utils.model_utils import UNet, AttU_Net, Hybrid_Net
-from utils.helper_functions import load_data, select_model
+from utils.helper_functions import load_data, select_model, scale_norm
 from utils.loss_utils import DiceBCELoss, DiceBCELossModified
 
 
@@ -56,10 +56,10 @@ use_gpu = torch.cuda.is_available()
 if use_gpu:
     print('Using: ', torch.cuda.get_device_name())
 
-x_train, y_train, x_val, y_val, in_chan, out_chan = load_data(config.data_dir, return_channel_counts=True)
+x_train, y_train, x_val, y_val = load_data(path.join(config.data_dir, 'undistorted'), print_shape=True, switch_channel_dim=True)
 
-model = select_model(model_args['ishybrid'], model_args['attn'], in_chan=in_chan, out_chan=out_chan, use_gpu=use_gpu)
-print('start')
+model = select_model(model_args['ishybrid'], model_args['attn'], in_chan=3, out_chan=1, use_gpu=use_gpu)
+
 summ = summary(model, input_size=[1].append(x_train.shape[1:]), input_data=x_train[0:2], col_names=('input_size', 'output_size',  'kernel_size', 'num_params'))
 
 optimizer = SGD(model.parameters(), lr=train_args['initial_lr'])
@@ -78,8 +78,8 @@ else:
 # Add stuff to training_args dict
 dict = optimizer.state_dict()['param_groups'][0].copy()
 del dict['params']
-train_args['optimizer'] = {'type': optimizer.__name__, 'params': dict}
-train_args['loss'] = loss.__class__
+train_args['optimizer'] = {'type': type(optimizer).__name__, 'params': dict}
+train_args['loss'] = type(loss).__name__
 
 '''
 Due to the weird way Sayan structured the code when prototyping, we have
@@ -94,9 +94,10 @@ dtv_class = Dataset_train_val(train_args['batch_size'], use_gpu)
 # TV takes DTV object as a parameter during training, also defines hybrid loss function
 tv_class = Training_Validation(model_args['ishybrid'], power=model_args['power'], swap_coeffs=model_args['swap_coeff'])
 
-# Training
 if use_gpu:
     model = model.cuda()
+
+# Training
 train_metrics, val_metrics = tv_class.train_valid(
     unet=model,
     train_data=(x_train, y_train),
