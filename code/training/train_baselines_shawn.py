@@ -1,13 +1,12 @@
-# Imports
+#  Imports
 from pickletools import optimize
 from select import select
-
 from tqdm import tqdm
 import config
 import sys
 import torch
 from os import path, makedirs
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 from torch.optim.lr_scheduler import MultiStepLR
 import argparse
 import pandas as pd
@@ -17,19 +16,17 @@ from torchinfo import summary
 import numpy as np
 
 # Custom imports
-sys.path.append(config.base_dir) # allow imports from base dir
+sys.path.append(config.base_dir) # Allow imports from base dir
 from utils.dataset_train_val import Dataset_train_val
 from utils.training_validation_utils import Training_Validation
 from utils.model_utils import UNet, AttU_Net, Hybrid_Net
 from utils.helper_functions import load_data, select_model, scale_norm
 from utils.loss_utils import DiceBCELoss, DiceBCELossModified
 
-
-
 save = True
 
 model_args = {
-    'name': 'unet_basic_test1',
+    'name': 'unet_basic_test11',
     'attn': None,
     'ishybrid': False,
     'power': None,
@@ -38,15 +35,16 @@ model_args = {
 
 train_args = {
     'batch_size': 32,
-    'epochs': 1,
-    'initial_lr': 0.01,
-    'lr_schedule': None,
+    'epochs': 200,
+    'initial_lr': 0.001,
+    'lr_schedule': False,
+    'thresh_train_masks': True
 }
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-sp', '--save_path', default=path.join('trained_models/', model_args['name']), help='Path to save the model to')
+parser.add_argument('-sp', '--save_path', default=model_args['name'], help='Path to save the model to')
 parser.add_argument('-tq', '--tqdm', action='store_true', help='If included a progress bar is shown during training')
-parser.add_argument('-el', '--epoch_lapse', default=20, help='The period of epochs to wait between model validations')
+parser.add_argument('-el', '--epoch_lapse', default=1, help='The period of epochs to wait between model validations')
 args = parser.parse_args()
 
 if model_args['ishybrid']:
@@ -56,30 +54,33 @@ use_gpu = torch.cuda.is_available()
 if use_gpu:
     print('Using: ', torch.cuda.get_device_name())
 
-x_train, y_train, x_val, y_val = load_data(path.join(config.data_dir, 'undistorted'), print_shape=True, switch_channel_dim=True)
+x_train, y_train = load_data(path.join(config.data_dir, 'undistorted/train.pt'), switch_channel_dim=True, thresh=train_args['thresh_train_masks'])
+x_val, y_val = load_data(path.join(config.data_dir, 'downsized_cropped/val.pt'), switch_channel_dim=True, thresh=True)
 
 model = select_model(model_args['ishybrid'], model_args['attn'], in_chan=3, out_chan=1, use_gpu=use_gpu)
 
 summ = summary(model, input_size=[1].append(x_train.shape[1:]), input_data=x_train[0:2], col_names=('input_size', 'output_size',  'kernel_size', 'num_params'))
 
-optimizer = SGD(model.parameters(), lr=train_args['initial_lr'])
+#optimizer = SGD(model.parameters(), lr=train_args['initial_lr'], momentum=0.9, nesterov=True)
+optimizer = Adam(model.parameters(), lr=train_args['initial_lr'])
 
-if train_args['lr_schedule'] is not None:
-    milestones = []
-    gamma = 0.1
-    scheduler = MultiStepLR(optimizer, milestones, gamma)
-    train_args['lr_schedule'] = {'gamma': gamma, 'milestones': milestones}
+dict = optimizer.state_dict()['param_groups'][0].copy()
+del dict['params']
+train_args['optimizer'] = {'type': type(optimizer).__name__, 'params': dict}
 
+#Loss
 if model_args['ishybrid']:
     loss = DiceBCELossModified()
 else:
     loss = DiceBCELoss()
-
-# Add stuff to training_args dict
-dict = optimizer.state_dict()['param_groups'][0].copy()
-del dict['params']
-train_args['optimizer'] = {'type': type(optimizer).__name__, 'params': dict}
 train_args['loss'] = type(loss).__name__
+
+# LR schedule
+if train_args['lr_schedule'] is not None:
+    milestones = [20]
+    gamma = 0.1
+    scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
+    train_args['lr_schedule'] = {'gamma': gamma, 'milestones': milestones}
 
 '''
 Due to the weird way Sayan structured the code when prototyping, we have
@@ -110,11 +111,11 @@ train_metrics, val_metrics = tv_class.train_valid(
     epochs=train_args['epochs'],
     progress_bar=args.tqdm,
     epoch_lapse=int(args.epoch_lapse),
-    metrics=['DICE', 'IoU']
+    metrics=['DICE', 'IoU'],
+    scheduler=scheduler
     )
 
 if save:
-    print(path.isdir(args.save_path))
     if not path.isdir(args.save_path):
         makedirs(args.save_path)
 

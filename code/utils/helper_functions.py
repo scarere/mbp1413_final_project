@@ -34,26 +34,23 @@ def load_data_old(data_dir, print_shape=False, return_channel_counts=False):
     else:
         return x_train, y_train, x_val, y_val
 
-def load_data(data_dir, print_shape=False, switch_channel_dim=True):
-    train = torch.load(os.path.join(data_dir, 'train.pt'))
-    val = torch.load(os.path.join(data_dir, 'val.pt'))
-    x_train = scale_norm(torch.tensor(np.stack(train['image'].to_numpy()), dtype=torch.float32))
-    y_train = torch.unsqueeze(torch.tensor(np.stack(train['mask'].to_numpy()), dtype=torch.float32), -1)
-    x_val = scale_norm(torch.tensor(np.stack(val['image'].to_numpy()), dtype=torch.float32))
-    y_val = torch.unsqueeze(torch.tensor(np.stack(val['mask'].to_numpy()), dtype=torch.float32), -1)
+def load_data(data_file, switch_channel_dim=True, thresh=None):
+    data = torch.load(data_file)
+    x = np.stack(data['image'].to_numpy())
+    y = np.stack(data['mask'].to_numpy())
+
+    if thresh is not None:
+        y[y > thresh] = 1
+        y[y < thresh] = 0
+
+    x = scale_norm(torch.tensor(x, dtype=torch.float32))
+    y = torch.unsqueeze(torch.tensor(y, dtype=torch.float32), -1)
 
     if switch_channel_dim:
-        x_train = x_train.permute([0, 3, 1, 2])
-        y_train = y_train.permute([0, 3, 1, 2])
-        x_val = x_val.permute([0, 3, 1, 2])
-        y_val = y_val.permute([0, 3, 1, 2])
-
-    if print_shape:
-        print('x_train: ', x_train.shape)
-        print('y_train: ', y_train.shape)
-        print('x_val: ', x_val.shape)
-        print('y_val: ', y_val.shape)
-    return x_train, y_train, x_val, y_val
+        x = x.permute([0, 3, 1, 2])
+        y = y.permute([0, 3, 1, 2])
+        
+    return x, y
 
 def select_model(ishybrid, attn_type, in_chan=3, out_chan=1, use_gpu=False):
     '''Returns a pytorch model given a few arguments

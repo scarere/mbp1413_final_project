@@ -26,7 +26,7 @@ class Training_Validation():
         self.is_train_data_aug = is_train_data_aug
         self.is_apply_color_jitter = is_apply_color_jitter
 
-    def train_valid(self, unet, train_data, optimizer, criterion, batch_size, dtv, use_gpu, epochs, metrics = None, validation_data=None, epoch_lapse = 20, progress_bar=True):
+    def train_valid(self, unet, train_data, optimizer, criterion, batch_size, dtv, use_gpu, epochs, scheduler=None, metrics = None, validation_data=None, epoch_lapse = 1, progress_bar=True):
         x_train, y_train = train_data
         if not torch.is_tensor(x_train):
             x_train = torch.Tensor(x_train, dtype=torch.float32)
@@ -38,7 +38,7 @@ class Training_Validation():
         else:
             t = range(epochs)
 
-        train_metrics = {'epoch': [], 'loss': []}
+        train_metrics = {'epoch': [], 'loss': [], 'lr': []}
         val_metrics = {'epoch': [], 'val_loss': []}
         for metric in metrics:
             train_metrics[metric] = []
@@ -67,6 +67,8 @@ class Training_Validation():
             y_train = y_train[shuffle]
             epoch_metrics = {}
             train_metrics['epoch'].append(_+1)
+            train_metrics['lr'].append(scheduler.get_last_lr())
+            scheduler.step()
             for key in metrics_sum.keys():
                 epoch_metrics[key] = metrics_sum[key] / epoch_iter
                 train_metrics[key].append(epoch_metrics[key])
@@ -89,7 +91,7 @@ class Training_Validation():
                         val_metrics[key].append(val[key])
                     val_metrics['epoch'].append(_+1)
                     string = string + ' - ' + ', '.join([ ' val_' + metric + ': %.4f' % val_metrics['val_'+metric][-1] for metric in metrics_sum.keys()])
-                print(string)
+                print(string, flush=True)
 
         return train_metrics, val_metrics
         

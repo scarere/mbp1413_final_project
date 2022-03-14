@@ -1,0 +1,13 @@
+batch_size: 32
+epochs: 1000
+initial_lr: 0.01
+loss: DiceBCELoss
+lr_schedule: null
+optimizer:
+  params:
+    dampening: 0
+    lr: 0.01
+    momentum: 0
+    nesterov: false
+    weight_decay: 0
+  type: SGD

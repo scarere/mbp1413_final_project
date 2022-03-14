@@ -24,15 +24,20 @@ class Dataset_train_val(nn.Module):
         x_train, x_val, y_train, y_val =  train_test_split(x_train, y_train, test_size=split_ratio)
         return x_train, x_val, y_train, y_val, x_test
 
-    def eval(self, metrics, y_true, y_pred):
+    def eval(self, metrics, y_true, y_pred, thresh=0.5):
         output = {}
+        y = np.asarray(y_true.detach().cpu(), dtype=np.float32)
+        y[y > thresh] = 1
+        y[y <= thresh] = 0
+        y = torch.from_numpy(y).detach().cpu()
+        y_pred = y_pred.detach().cpu()
         for metric in metrics:
             if metric == 'DICE':
-                output['DICE'] = DiceBCELoss().dice_loss(y_true, y_pred).item()
+                output['DICE'] = DiceBCELoss().dice_loss(y, y_pred).item()
             elif metric == 'BCE':
-                output['BCE'] = DiceBCELoss().bce_loss(y_true, y_pred).item()
+                output['BCE'] = DiceBCELoss().bce_loss(y, y_pred).item()
             elif metric == 'IoU':
-                output['IoU'] = IOU_eval().iou_evaluate_better(y_true.int(), y_pred).item()
+                output['IoU'] = IOU_eval().iou_evaluate_better(y.int(), y_pred).item()
         return output
 
     def hybrid_loss(self, loss_1, loss_2):

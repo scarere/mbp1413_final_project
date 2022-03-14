@@ -1,0 +1,16 @@
+batch_size: 32
+epochs: 150
+initial_lr: 0.001
+loss: DiceBCELoss
+lr_schedule:
+  gamma: 0.1
+  milestones:
+  - 50
+optimizer:
+  params:
+    dampening: 0
+    lr: 0.001
+    momentum: 0.9
+    nesterov: true
+    weight_decay: 0
+  type: SGD
