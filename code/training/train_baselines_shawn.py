@@ -1,36 +1,33 @@
-# Imports
+#  Imports
 from pickletools import optimize
 from select import select
-
 from tqdm import tqdm
 import config
 import sys
 import torch
 from os import path, makedirs
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 from torch.optim.lr_scheduler import MultiStepLR
-import os
 import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
 import yaml
 from torchinfo import summary
+import numpy as np
 
 # Custom imports
-sys.path.append(config.base_dir) # allow imports from base dir
+sys.path.append(config.base_dir) # Allow imports from base dir
 from utils.dataset_train_val import Dataset_train_val
 from utils.training_validation_utils import Training_Validation
 from utils.model_utils import UNet, AttU_Net, Hybrid_Net
-from utils.helper_functions import load_data, select_model
+from utils.helper_functions import load_data, select_model, scale_norm
 from utils.loss_utils import DiceBCELoss, DiceBCELossModified
-
-
 
 save = True
 
 model_args = {
-    'name': 'unet_basic_test1',
-    'attn': None,
+    'name': 'unet_cosine_test1',
+    'attn': 'cosine',
     'ishybrid': False,
     'power': None,
     'swap_coeff': False
@@ -38,16 +35,29 @@ model_args = {
 
 train_args = {
     'batch_size': 32,
-    'epochs': 1,
-    'initial_lr': 0.01,
-    'lr_schedule': None,
+    'val_batch_size': None,
+    'epochs': 50,
+    'initial_lr': 0.001,
+    'lr_schedule': False,
+    'train_mask_threshold': 0.5,
+    'train_set': 'undistorted',
+    'val_set': 'downsized_cropped',
+    'data_sayan': False
 }
+if train_args['data_sayan']:
+    data_dir = path.join(config.data_dir, 'data_sayan')
+else:
+    data_dir = config.data_dir
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-sp', '--save_path', default=path.join('trained_models/', model_args['name']), help='Path to save the model to')
+parser.add_argument('-sp', '--save_path', default=model_args['name'], help='Path to save the model to')
 parser.add_argument('-tq', '--tqdm', action='store_true', help='If included a progress bar is shown during training')
-parser.add_argument('-el', '--epoch_lapse', default=20, help='The period of epochs to wait between model validations')
+parser.add_argument('-el', '--epoch_lapse', default=1, help='The period of epochs to wait between model validations')
+parser.add_argument('-sl', '--slurm_id', default=None, help='The slurm job id')
 args = parser.parse_args()
+
+if args.slurm_id is not None:
+    train_args['slurm_id'] = int(args.slurm_id)
 
 if model_args['ishybrid']:
     model_args['power'] = 2.0
@@ -56,30 +66,38 @@ use_gpu = torch.cuda.is_available()
 if use_gpu:
     print('Using: ', torch.cuda.get_device_name())
 
-x_train, y_train, x_val, y_val, in_chan, out_chan = load_data(config.data_dir, return_channel_counts=True)
+x_train, y_train = load_data(path.join(data_dir,train_args['train_set'], 'train.pt'), switch_channel_dim=True, thresh=train_args['train_mask_threshold'])
+x_val, y_val = load_data(path.join(data_dir, train_args['val_set'], 'val.pt'), switch_channel_dim=True, thresh=0.5)
 
-model = select_model(model_args['ishybrid'], model_args['attn'], in_chan=in_chan, out_chan=out_chan, use_gpu=use_gpu)
-print('start')
+model = select_model(model_args['ishybrid'], model_args['attn'], in_chan=3, out_chan=1, use_gpu=use_gpu)
+
 summ = summary(model, input_size=[1].append(x_train.shape[1:]), input_data=x_train[0:2], col_names=('input_size', 'output_size',  'kernel_size', 'num_params'))
 
-optimizer = SGD(model.parameters(), lr=train_args['initial_lr'])
+optimizer = SGD(model.parameters(), lr=train_args['initial_lr'], momentum=0.99, nesterov=True)
+#optimizer = Adam(model.parameters(), lr=train_args['initial_lr'])
 
-if train_args['lr_schedule'] is not None:
-    milestones = []
-    gamma = 0.1
-    scheduler = MultiStepLR(optimizer, milestones, gamma)
-    train_args['lr_schedule'] = {'gamma': gamma, 'milestones': milestones}
+dict = optimizer.state_dict()['param_groups'][0].copy()
+del dict['params']
+train_args['optimizer'] = {'type': type(optimizer).__name__, 'params': dict}
 
+#Loss
 if model_args['ishybrid']:
     loss = DiceBCELossModified()
 else:
     loss = DiceBCELoss()
+train_args['loss'] = type(loss).__name__
 
-# Add stuff to training_args dict
-dict = optimizer.state_dict()['param_groups'][0].copy()
-del dict['params']
-train_args['optimizer'] = {'type': optimizer.__name__, 'params': dict}
-train_args['loss'] = loss.__class__
+# LR schedule
+if train_args['lr_schedule']:
+    milestones = [20]
+    gamma = 0.1
+    scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
+    train_args['lr_schedule'] = {'gamma': gamma, 'milestones': milestones}
+else:
+    scheduler=None
+
+if not isinstance(train_args['val_batch_size'], int):
+    train_args['val_batch_size'] = y_val.shape[0]
 
 '''
 Due to the weird way Sayan structured the code when prototyping, we have
@@ -89,14 +107,15 @@ the code into something that makes more sense. But for now we use the
 tools as they are
 '''
 # DTV class defines data loading, base training loops and val loss calculations
-dtv_class = Dataset_train_val(train_args['batch_size'], use_gpu)
+dtv_class = Dataset_train_val(val_batch_size=train_args['val_batch_size'], use_gpu=use_gpu)
 
 # TV takes DTV object as a parameter during training, also defines hybrid loss function
-tv_class = Training_Validation(model_args['ishybrid'], power=model_args['power'], swap_coeffs=model_args['swap_coeff'])
+tv_class = Training_Validation(power=model_args['power'], swap_coeffs=model_args['swap_coeff'])
 
-# Training
 if use_gpu:
     model = model.cuda()
+
+# Training
 train_metrics, val_metrics = tv_class.train_valid(
     unet=model,
     train_data=(x_train, y_train),
@@ -109,11 +128,11 @@ train_metrics, val_metrics = tv_class.train_valid(
     epochs=train_args['epochs'],
     progress_bar=args.tqdm,
     epoch_lapse=int(args.epoch_lapse),
-    metrics=['DICE', 'IoU']
+    metrics=['DICE', 'IoU'],
+    scheduler=scheduler
     )
 
 if save:
-    print(path.isdir(args.save_path))
     if not path.isdir(args.save_path):
         makedirs(args.save_path)
 
