@@ -1,5 +1,5 @@
-attn: null
+attn: cosine
 ishybrid: false
-name: unet_basic_test2
+name: unet_cosine_test1
 power: null
 swap_coeff: false

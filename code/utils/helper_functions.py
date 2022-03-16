@@ -34,14 +34,13 @@ def load_data_old(data_dir, print_shape=False, return_channel_counts=False):
     else:
         return x_train, y_train, x_val, y_val
 
-def load_data(data_file, switch_channel_dim=True, thresh=None):
+def load_data(data_file, switch_channel_dim=True, thresh: int=None):
     data = torch.load(data_file)
     x = np.stack(data['image'].to_numpy())
     y = np.stack(data['mask'].to_numpy())
 
     if thresh is not None:
-        y[y > thresh] = 1
-        y[y < thresh] = 0
+        y = y >= thresh
 
     x = scale_norm(torch.tensor(x, dtype=torch.float32))
     y = torch.unsqueeze(torch.tensor(y, dtype=torch.float32), -1)
