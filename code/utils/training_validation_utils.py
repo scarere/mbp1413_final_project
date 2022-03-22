@@ -16,6 +16,8 @@ from loss_utils import *
 from augmentation_utils import DataAugmentation
 from segment_metrics import IOU_eval
 import time
+import glob
+from augmentations import rotate
 
 class Training_Validation():
     def __init__(self,power=400,swap_coeffs=False,is_train_data_aug=False,is_apply_color_jitter=False):
@@ -25,7 +27,11 @@ class Training_Validation():
         self.is_train_data_aug = is_train_data_aug
         self.is_apply_color_jitter = is_apply_color_jitter
 
-    def train_valid(self, unet, train_data, optimizer, criterion, batch_size, dtv, use_gpu, epochs, scheduler=None, metrics = None, validation_data=None, epoch_lapse = 1, progress_bar=True):
+    def train_valid(self, unet, train_data, optimizer, criterion, batch_size, 
+        dtv, use_gpu, epochs, scheduler=None, metrics = None, validation_data=None, 
+        epoch_lapse = 1, progress_bar=True, checkpoint_path=None, early_stop:int=None,
+        angle: int=0, base_angles=[0]):
+
         x_train, y_train = train_data
         if not torch.is_tensor(x_train):
             x_train = torch.Tensor(x_train, dtype=torch.float32)
@@ -41,6 +47,9 @@ class Training_Validation():
         else:
             t = range(epochs)
 
+        if checkpoint_path and (not os.path.isdir(checkpoint_path)):
+            os.makedirs(checkpoint_path)
+
         train_metrics = {'epoch': [], 'loss': []}
         val_metrics = {'epoch': [], 'val_loss': []}
         for metric in metrics:
@@ -49,7 +58,8 @@ class Training_Validation():
 
         if scheduler is not None:
             train_metrics['lr'] = []
-
+        # Initialize current checkpoints both as epoch 1 (index 0 in metrics)
+        ckpt_list = np.array([0, 0]) # Length of this determines how many checkpoints to save. Saves top n checkpoints
         for _ in t: # epoch loop
             ts = time.time()
             metrics_sum = dict((metric, 0) for metric in metrics)
@@ -57,6 +67,7 @@ class Training_Validation():
             for i in range(epoch_iter): # train step loop
                 batch_train_x = x_train[i * batch_size : (i + 1) * batch_size]
                 batch_train_y = y_train[i * batch_size : (i + 1) * batch_size]
+                batch_train_x, batch_train_y = rotate(batch_train_x, batch_train_y, angle)
                 batch_metrics = dtv.train_step(batch_train_x , batch_train_y, optimizer, criterion, unet, metrics=metrics)
                 for key in batch_metrics.keys():
                     metrics_sum[key] += batch_metrics[key]
@@ -75,7 +86,7 @@ class Training_Validation():
             for key in metrics_sum.keys():
                 epoch_metrics[key] = metrics_sum[key] / epoch_iter
                 train_metrics[key].append(epoch_metrics[key])
-
+            
             if (_+1) % epoch_lapse == 0: # validation
                 string = 'Epoch %.0f/%.0f -- %.0fs, %.3fs/step - ' % (_+1, epochs, te, te/epoch_iter)
                 string = string + ', '.join([ ' ' + metric + ': %.4f' % train_metrics[metric][-1] for metric in metrics_sum.keys()])
@@ -91,8 +102,27 @@ class Training_Validation():
                         val_metrics[key].append(val[key])
                     val_metrics['epoch'].append(_+1)
                     string = string + ' - ' + ', '.join([ ' val_' + metric + ': %.4f' % val_metrics['val_'+metric][-1] for metric in metrics_sum.keys()])
-                print(string, flush=True)
 
-        return train_metrics, val_metrics
+                    if checkpoint_path:
+                        v = np.array(val_metrics['val_IoU'])
+                        ind = np.argmin(v[ckpt_list]) # get index of worst checkpoint in ckpt_ind
+                        if v[ckpt_list[ind]] < val['val_IoU']:
+                            # remove 
+                            for file in glob.glob(os.path.join(checkpoint_path, 'ckpt_epoch_' + str(ckpt_list[ind]+1) + '*')):
+                                os.remove(file)
+                            # save new checkpoint
+                            torch.save(unet, os.path.join(checkpoint_path, 'ckpt_epoch_' + str(_+1) + '.pt'))
+                            string = string + ' - ckpt saved'
+                            # Replace index of worst ckpt with index of new ckpt (epoch - 1)
+                            ckpt_list[ind] = len(v) - 1
+
+                print(string, flush=True)
+            
+            if early_stop is not None:
+                if all(i > (np.min(val_metrics['val_loss']) + 0.2) for i in val_metrics['val_loss'][-early_stop:]):
+                    print('Stopping early because val loss has been 0.2 greater than lowest val loss for %i consecutive epochs' % early_stop)
+                    return train_metrics, val_metrics, True
+
+        return train_metrics, val_metrics, False
         
            

@@ -10,6 +10,7 @@ torchmetrics
 imageio
 scikit-image
 ipywidgets
+torchvision
 
 # If using gpu must pip install +cu113 extensions for the following
 torch
