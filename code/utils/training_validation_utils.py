@@ -30,7 +30,7 @@ class Training_Validation():
     def train_valid(self, unet, train_data, optimizer, criterion, batch_size, 
         dtv, use_gpu, epochs, scheduler=None, metrics = None, validation_data=None, 
         epoch_lapse = 1, progress_bar=True, checkpoint_path=None, early_stop:int=None,
-        angle: int=0, base_angles=[0]):
+        angle: int=0, base_angles=[0], rotate_crop=False):
 
         x_train, y_train = train_data
         if not torch.is_tensor(x_train):
@@ -67,7 +67,7 @@ class Training_Validation():
             for i in range(epoch_iter): # train step loop
                 batch_train_x = x_train[i * batch_size : (i + 1) * batch_size]
                 batch_train_y = y_train[i * batch_size : (i + 1) * batch_size]
-                batch_train_x, batch_train_y = rotate(batch_train_x, batch_train_y, angle)
+                #batch_train_x, batch_train_y = rotate(batch_train_x, batch_train_y, angle, base_angles=base_angles, crop=rotate_crop)
                 batch_metrics = dtv.train_step(batch_train_x , batch_train_y, optimizer, criterion, unet, metrics=metrics)
                 for key in batch_metrics.keys():
                     metrics_sum[key] += batch_metrics[key]

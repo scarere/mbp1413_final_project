@@ -566,7 +566,7 @@ class UNet(nn.Module):
         # Decode
         #print(x.shape, encode_block1.shape, encode_block2.shape, encode_block3.shape, encode_pool3.shape, bottleneck1.shape)
         #print('Decode Block 3')
-        #print(bottleneck1.shape, encode_block3.shape)
+        #print(bottleneck1.shape, encode_block4.shape, encode_pool4.shape)
         decode_block4 = self.crop_and_concat(bottleneck1, encode_block4, crop=True)
         cat_layer3 = self.conv_decode4(decode_block4)
         decode_block3 = self.crop_and_concat(cat_layer3, encode_block3, crop=True)

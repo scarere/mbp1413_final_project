@@ -26,7 +26,7 @@ from utils.loss_utils import DiceBCELoss, DiceBCELossModified
 save = True
 
 model_args = {
-    'name': 'unet_rot_180',
+    'name': 'unet_basic_test14_3',
     'attn': None,
     'ishybrid': False,
     'power': None,
@@ -44,9 +44,11 @@ train_args = {
     'val_set': 'downsized_cropped',
     'data_sayan': False,
     'stopped_early': False,
-    'rotate_angle': 180,
-    'rotate_base_angles': [0]
+    'rotate_angle': 0,
+    'rotate_base_angles': [0],
+    'rotate_crop': False
 }
+
 if train_args['data_sayan']:
     data_dir = path.join(config.data_dir, 'data_sayan')
 else:
@@ -130,6 +132,7 @@ train_metrics, val_metrics, stopped_early = tv_class.train_valid(
     early_stop=10,
     angle=train_args['rotate_angle'],
     base_angles=train_args['rotate_base_angles'],
+    rotate_crop=train_args['rotate_crop']
     )
 
 train_args['stopped_early'] = stopped_early
