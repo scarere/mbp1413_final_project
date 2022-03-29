@@ -26,7 +26,7 @@ from utils.loss_utils import DiceBCELoss, DiceBCELossModified
 save = True
 
 model_args = {
-    'name': 'unet_basic_test14_3',
+    'name': 'unet_basic_tu-vu_nothresh',
     'attn': None,
     'ishybrid': False,
     'power': None,
@@ -39,9 +39,9 @@ train_args = {
     'epochs': 300,
     'initial_lr': 0.001,
     'lr_schedule': True,
-    'train_mask_threshold': 0.5,
+    'train_mask_threshold': None,
     'train_set': 'undistorted',
-    'val_set': 'downsized_cropped',
+    'val_set': 'undistorted',
     'data_sayan': False,
     'stopped_early': False,
     'rotate_angle': 0,
@@ -73,6 +73,13 @@ if use_gpu:
 
 x_train, y_train = load_data(path.join(data_dir,train_args['train_set'], 'train.pt'), switch_channel_dim=True, thresh=train_args['train_mask_threshold'])
 x_val, y_val = load_data(path.join(data_dir, train_args['val_set'], 'val.pt'), switch_channel_dim=True, thresh=0.5)
+
+train_args['val_set_2'] = 'resampled'
+x_val2, y_val2 = load_data(path.join(data_dir, train_args['val_set_2'], 'val.pt'), switch_channel_dim=True, thresh=0.5)
+
+train_args['val_set_3'] = 'downsized_cropped'
+x_val3, y_val3 = load_data(path.join(data_dir, train_args['val_set_3'], 'val.pt'), switch_channel_dim=True, thresh=0.5)
+
 
 model = select_model(model_args['ishybrid'], model_args['attn'], in_chan=3, out_chan=1, use_gpu=use_gpu)
 
@@ -117,7 +124,7 @@ if use_gpu:
 train_metrics, val_metrics, stopped_early = tv_class.train_valid(
     unet=model,
     train_data=(x_train, y_train),
-    validation_data=(x_val, y_val),
+    validation_data=[(x_val, y_val), (x_val2, y_val2), (x_val3, y_val3)],
     dtv=dtv_class,
     optimizer=optimizer,
     criterion=loss,

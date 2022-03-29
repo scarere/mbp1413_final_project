@@ -18,6 +18,7 @@ from segment_metrics import IOU_eval
 import time
 import glob
 from augmentations import rotate
+from collections import defaultdict
 
 class Training_Validation():
     def __init__(self,power=400,swap_coeffs=False,is_train_data_aug=False,is_apply_color_jitter=False):
@@ -55,6 +56,12 @@ class Training_Validation():
         for metric in metrics:
             train_metrics[metric] = []
             val_metrics['val_' + metric] = []
+        
+        if len(validation_data) > 1:
+            for i in range(2, len(validation_data) + 1):
+                for metric in metrics:
+                    val_metrics['val_' + metric + '_' + str(i)] = []
+                    val_metrics['val_loss_' + str(i)] = []
 
         if scheduler is not None:
             train_metrics['lr'] = []
@@ -91,22 +98,31 @@ class Training_Validation():
                 string = 'Epoch %.0f/%.0f -- %.0fs, %.3fs/step - ' % (_+1, epochs, te, te/epoch_iter)
                 string = string + ', '.join([ ' ' + metric + ': %.4f' % train_metrics[metric][-1] for metric in metrics_sum.keys()])
                 if validation_data is not None:
-                    x_val, y_val = validation_data
-                    if not torch.is_tensor(x_val):
-                        x_val = torch.Tensor(x_val, dtype=torch.float32)
-                        y_val = torch.Tensor(y_val, dtype=torch.float32)
-
-                    val = dtv.get_val_metrics(x_val, y_val, criterion, unet, metrics)
-
-                    for key in val.keys():
-                        val_metrics[key].append(val[key])
                     val_metrics['epoch'].append(_+1)
-                    string = string + ' - ' + ', '.join([ ' val_' + metric + ': %.4f' % val_metrics['val_'+metric][-1] for metric in metrics_sum.keys()])
+                    for i, val_set in enumerate(validation_data):
+                        x_val, y_val = val_set
+                        if not torch.is_tensor(x_val):
+                            x_val = torch.Tensor(x_val, dtype=torch.float32)
+                            y_val = torch.Tensor(y_val, dtype=torch.float32)
+
+                        val = dtv.get_val_metrics(x_val, y_val, criterion, unet, metrics)
+                        
+                        if i == 0:
+                            for key in val.keys():
+                                val_metrics[key].append(val[key])
+                            
+                            string = string + ' - ' + ', '.join([ ' val_' + metric + ': %.4f' % val_metrics['val_'+metric][-1] for metric in metrics_sum.keys()])
+                        else:
+                            for key in val.keys():
+                                val_metrics[key + '_' + str(i + 1)].append(val[key])
+                                # We don't add the metrics from additional val sets to output string bc it makes it too long and unreadable
+                        
 
                     if checkpoint_path:
+                        # If there are multiple validation sets, uses the first one for checkpointing
                         v = np.array(val_metrics['val_IoU'])
                         ind = np.argmin(v[ckpt_list]) # get index of worst checkpoint in ckpt_ind
-                        if v[ckpt_list[ind]] < val['val_IoU']:
+                        if v[ckpt_list[ind]] < val_metrics['val_IoU'][-1]:
                             # remove 
                             for file in glob.glob(os.path.join(checkpoint_path, 'ckpt_epoch_' + str(ckpt_list[ind]+1) + '*')):
                                 os.remove(file)
