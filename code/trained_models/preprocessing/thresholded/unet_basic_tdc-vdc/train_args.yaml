@@ -1,0 +1,29 @@
+batch_size: 32
+data_sayan: false
+epochs: 300
+initial_lr: 0.001
+loss: DiceBCELoss
+lr_schedule:
+  gamma: 0.5
+  milestones:
+  - 10
+optimizer:
+  params:
+    dampening: 0
+    lr: 0.001
+    momentum: 0.9
+    nesterov: true
+    weight_decay: 0
+  type: SGD
+rotate_angle: 0
+rotate_base_angles:
+- 0
+rotate_crop: false
+slurm_id: 5059158
+stopped_early: true
+train_mask_threshold: 0.5
+train_set: downsized_cropped
+val_batch_size: 77
+val_set: downsized_cropped
+val_set_2: undistorted
+val_set_3: resampled

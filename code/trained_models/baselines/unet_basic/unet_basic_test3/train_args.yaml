@@ -1,0 +1,19 @@
+batch_size: 32
+data_sayan: false
+epochs: 50
+initial_lr: 0.0001
+loss: DiceBCELoss
+lr_schedule: false
+optimizer:
+  params:
+    dampening: 0
+    lr: 0.0001
+    momentum: 0.99
+    nesterov: true
+    weight_decay: 0
+  type: SGD
+slurm_id: 4890160
+train_mask_threshold: 0.5
+train_set: undistorted
+val_batch_size: 77
+val_set: downsized_cropped

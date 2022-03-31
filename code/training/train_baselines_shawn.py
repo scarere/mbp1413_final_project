@@ -26,8 +26,8 @@ from utils.loss_utils import DiceBCELoss, DiceBCELossModified
 save = True
 
 model_args = {
-    'name': 'unet_cosine_test1',
-    'attn': 'cosine',
+    'name': 'unet_basic_tu-vdc_nothresh',
+    'attn': None,
     'ishybrid': False,
     'power': None,
     'swap_coeff': False
@@ -36,14 +36,19 @@ model_args = {
 train_args = {
     'batch_size': 32,
     'val_batch_size': None,
-    'epochs': 50,
+    'epochs': 300,
     'initial_lr': 0.001,
-    'lr_schedule': False,
-    'train_mask_threshold': 0.5,
+    'lr_schedule': True,
+    'train_mask_threshold': None,
     'train_set': 'undistorted',
     'val_set': 'downsized_cropped',
-    'data_sayan': False
+    'data_sayan': False,
+    'stopped_early': False,
+    'rotate_angle': 0,
+    'rotate_base_angles': [0],
+    'rotate_crop': False
 }
+
 if train_args['data_sayan']:
     data_dir = path.join(config.data_dir, 'data_sayan')
 else:
@@ -69,11 +74,18 @@ if use_gpu:
 x_train, y_train = load_data(path.join(data_dir,train_args['train_set'], 'train.pt'), switch_channel_dim=True, thresh=train_args['train_mask_threshold'])
 x_val, y_val = load_data(path.join(data_dir, train_args['val_set'], 'val.pt'), switch_channel_dim=True, thresh=0.5)
 
+train_args['val_set_2'] = 'resampled'
+x_val2, y_val2 = load_data(path.join(data_dir, train_args['val_set_2'], 'val.pt'), switch_channel_dim=True, thresh=0.5)
+
+train_args['val_set_3'] = 'undistorted'
+x_val3, y_val3 = load_data(path.join(data_dir, train_args['val_set_3'], 'val.pt'), switch_channel_dim=True, thresh=0.5)
+
+
 model = select_model(model_args['ishybrid'], model_args['attn'], in_chan=3, out_chan=1, use_gpu=use_gpu)
 
 summ = summary(model, input_size=[1].append(x_train.shape[1:]), input_data=x_train[0:2], col_names=('input_size', 'output_size',  'kernel_size', 'num_params'))
 
-optimizer = SGD(model.parameters(), lr=train_args['initial_lr'], momentum=0.99, nesterov=True)
+optimizer = SGD(model.parameters(), lr=train_args['initial_lr'], momentum=0.9, nesterov=True)
 #optimizer = Adam(model.parameters(), lr=train_args['initial_lr'])
 
 dict = optimizer.state_dict()['param_groups'][0].copy()
@@ -89,8 +101,8 @@ train_args['loss'] = type(loss).__name__
 
 # LR schedule
 if train_args['lr_schedule']:
-    milestones = [20]
-    gamma = 0.1
+    milestones = [10]
+    gamma = 0.5
     scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
     train_args['lr_schedule'] = {'gamma': gamma, 'milestones': milestones}
 else:
@@ -99,13 +111,6 @@ else:
 if not isinstance(train_args['val_batch_size'], int):
     train_args['val_batch_size'] = y_val.shape[0]
 
-'''
-Due to the weird way Sayan structured the code when prototyping, we have
-two classes with overlapping functionality that are used to define
-all the training loops and so on. Hopefully we have time to restructure
-the code into something that makes more sense. But for now we use the 
-tools as they are
-'''
 # DTV class defines data loading, base training loops and val loss calculations
 dtv_class = Dataset_train_val(val_batch_size=train_args['val_batch_size'], use_gpu=use_gpu)
 
@@ -116,10 +121,10 @@ if use_gpu:
     model = model.cuda()
 
 # Training
-train_metrics, val_metrics = tv_class.train_valid(
+train_metrics, val_metrics, stopped_early = tv_class.train_valid(
     unet=model,
     train_data=(x_train, y_train),
-    validation_data=(x_val, y_val),
+    validation_data=[(x_val, y_val), (x_val2, y_val2), (x_val3, y_val3)],
     dtv=dtv_class,
     optimizer=optimizer,
     criterion=loss,
@@ -129,8 +134,15 @@ train_metrics, val_metrics = tv_class.train_valid(
     progress_bar=args.tqdm,
     epoch_lapse=int(args.epoch_lapse),
     metrics=['DICE', 'IoU'],
-    scheduler=scheduler
+    scheduler=scheduler,
+    checkpoint_path=args.save_path,
+    early_stop=None,
+    angle=train_args['rotate_angle'],
+    base_angles=train_args['rotate_base_angles'],
+    rotate_crop=train_args['rotate_crop']
     )
+
+train_args['stopped_early'] = stopped_early
 
 if save:
     if not path.isdir(args.save_path):
@@ -148,12 +160,3 @@ if save:
 
     with open(path.join(args.save_path, model_args['name'] + '.txt'), 'w') as file:
         file.write(summ.__repr__())
-    
-
-    
-
-    
-
-    
-
-
