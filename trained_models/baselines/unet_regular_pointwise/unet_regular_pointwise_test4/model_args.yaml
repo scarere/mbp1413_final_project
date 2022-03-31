@@ -1,0 +1,5 @@
+attn: regular_pointwise
+ishybrid: false
+name: unet_regular_pointwise_test3
+power: null
+swap_coeff: false
