@@ -1,0 +1,5 @@
+attn: cosine
+ishybrid: false
+name: unet_cosine_test4
+power: null
+swap_coeff: false
