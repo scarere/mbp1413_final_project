@@ -1,4 +1,4 @@
-# Navigating Data Augmentation in Nuclei Segmentation
+# A Closer Look at Data Augmentation and Preprocessing for Segmentation with Kernel Attention U-Net's
 
 Final Project for MBP1413: Biomedical Applicationg of Artificial Intelligence
 
