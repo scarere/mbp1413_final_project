@@ -26,7 +26,7 @@ from utils.loss_utils import DiceBCELoss, DiceBCELossModified
 save = True
 
 model_args = {
-    'name': 'unet_basic_tu-vu_nothresh',
+    'name': 'unet_basic_tu-vdc_nothresh',
     'attn': None,
     'ishybrid': False,
     'power': None,
@@ -41,7 +41,7 @@ train_args = {
     'lr_schedule': True,
     'train_mask_threshold': None,
     'train_set': 'undistorted',
-    'val_set': 'undistorted',
+    'val_set': 'downsized_cropped',
     'data_sayan': False,
     'stopped_early': False,
     'rotate_angle': 0,
@@ -77,7 +77,7 @@ x_val, y_val = load_data(path.join(data_dir, train_args['val_set'], 'val.pt'), s
 train_args['val_set_2'] = 'resampled'
 x_val2, y_val2 = load_data(path.join(data_dir, train_args['val_set_2'], 'val.pt'), switch_channel_dim=True, thresh=0.5)
 
-train_args['val_set_3'] = 'downsized_cropped'
+train_args['val_set_3'] = 'undistorted'
 x_val3, y_val3 = load_data(path.join(data_dir, train_args['val_set_3'], 'val.pt'), switch_channel_dim=True, thresh=0.5)
 
 
@@ -136,7 +136,7 @@ train_metrics, val_metrics, stopped_early = tv_class.train_valid(
     metrics=['DICE', 'IoU'],
     scheduler=scheduler,
     checkpoint_path=args.save_path,
-    early_stop=10,
+    early_stop=None,
     angle=train_args['rotate_angle'],
     base_angles=train_args['rotate_base_angles'],
     rotate_crop=train_args['rotate_crop']
